@@ -5,19 +5,74 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// 🔍 ANÁLISIS SIMPLE Y ESTABLE
+// 🔍 FUNCIÓN DE ANÁLISIS MEJORADA (CLASIFICA BIEN)
 function analizarCasoTexto(caso) {
+
   const t = caso.toLowerCase();
 
-  if (t.includes("golpear") || t.includes("amenaza")) {
-    return "Tipo III - Situación grave. Requiere intervención inmediata y posible activación de entidades externas.";
+  // 🔴 TIPO III (GRAVE)
+  if (
+    t.includes("golpe") ||
+    t.includes("agred") ||
+    t.includes("pelea") ||
+    t.includes("amenaza") ||
+    t.includes("arma") ||
+    t.includes("droga")
+  ) {
+    return `
+Clasificación: Tipo III - Situación grave
+
+Recomendación:
+- Activación inmediata del Comité de Convivencia Escolar
+- Citación urgente a acudiente
+- Registro en observador del estudiante
+- Posible remisión a entidades externas (ICBF, Comisaría de Familia)
+
+Fundamento legal:
+Ley 1620 de 2013 y Decreto 1965 de 2013.
+
+Debido proceso:
+Artículo 29 de la Constitución Política de Colombia.
+`;
   }
 
-  if (t.includes("grosería") || t.includes("tarde") || t.includes("irrespeto")) {
-    return "Tipo II - Situación que afecta la convivencia. Se recomienda citación a acudiente y seguimiento.";
+  // 🟠 TIPO II (MODERADO)
+  if (
+    t.includes("groser") ||
+    t.includes("irrespeto") ||
+    t.includes("tarde") ||
+    t.includes("indisciplina")
+  ) {
+    return `
+Clasificación: Tipo II - Situación que afecta la convivencia
+
+Recomendación:
+- Citación a acudiente
+- Compromiso pedagógico
+- Seguimiento por coordinación
+
+Fundamento legal:
+Ley 1620 de 2013 y Decreto 1965 de 2013.
+
+Debido proceso:
+Artículo 29 de la Constitución Política de Colombia.
+`;
   }
 
-  return "Tipo I - Situación leve. Se recomienda orientación pedagógica.";
+  // 🟢 TIPO I (LEVE)
+  return `
+Clasificación: Tipo I - Situación leve
+
+Recomendación:
+- Llamado de atención
+- Orientación pedagógica
+
+Fundamento legal:
+Ley 1620 de 2013 y Decreto 1965 de 2013.
+
+Debido proceso:
+Artículo 29 de la Constitución Política de Colombia.
+`;
 }
 
 // 🔴 RUTA PRINCIPAL
@@ -31,20 +86,10 @@ app.post("/analizar", (req, res) => {
 
     const resultado = analizarCasoTexto(caso);
 
-    res.json({
-      resultado: `
-Clasificación: ${resultado}
-
-Fundamento legal:
-Ley 1620 de 2013 y Decreto 1965 de 2013.
-
-Debido proceso:
-Artículo 29 de la Constitución Política de Colombia.
-`
-    });
+    res.json({ resultado });
 
   } catch (error) {
-    res.json({ resultado: "Error controlado." });
+    res.json({ resultado: "Error controlado en el servidor." });
   }
 });
 

@@ -8,11 +8,32 @@ app.use(express.json());
 
 const DB_FILE = "casos.json";
 
-if (!fs.existsSync(DB_FILE)) {
-  fs.writeFileSync(DB_FILE, JSON.stringify([]));
+// 🔒 FUNCIÓN SEGURA PARA LEER
+function leerDB() {
+  try {
+    if (!fs.existsSync(DB_FILE)) {
+      fs.writeFileSync(DB_FILE, JSON.stringify([]));
+      return [];
+    }
+    const data = fs.readFileSync(DB_FILE);
+    return JSON.parse(data);
+  } catch (error) {
+    console.log("Error leyendo DB, reiniciando...");
+    fs.writeFileSync(DB_FILE, JSON.stringify([]));
+    return [];
+  }
 }
 
-// 🔍 ANALISIS + SANCIONES
+// 🔒 FUNCIÓN SEGURA PARA GUARDAR
+function guardarDB(data) {
+  try {
+    fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2));
+  } catch (error) {
+    console.log("Error guardando DB");
+  }
+}
+
+// 🔍 ANÁLISIS
 function analizarCasoTexto(caso) {
   const t = caso.toLowerCase();
 
@@ -23,7 +44,7 @@ function analizarCasoTexto(caso) {
         "Remisión inmediata a coordinación",
         "Activación del Comité de Convivencia",
         "Citación urgente a acudiente",
-        "Posible remisión a entidades externas (ICBF / Policía de infancia)",
+        "Posible remisión a entidades externas",
       ],
     };
   }
@@ -33,9 +54,8 @@ function analizarCasoTexto(caso) {
       tipo: "Tipo II",
       sanciones: [
         "Citación a acudiente",
-        "Compromiso pedagógico escrito",
+        "Compromiso pedagógico",
         "Seguimiento por coordinación",
-        "Registro en observador del estudiante",
       ],
     };
   }
@@ -44,13 +64,12 @@ function analizarCasoTexto(caso) {
     tipo: "Tipo I",
     sanciones: [
       "Llamado de atención",
-      "Reflexión pedagógica",
-      "Orientación formativa",
+      "Orientación pedagógica",
     ],
   };
 }
 
-// 🔴 ANALIZAR CASO
+// 🔴 ANALIZAR
 app.post("/analizar", (req, res) => {
   try {
     const { nombre, grado, caso } = req.body;
@@ -58,49 +77,44 @@ app.post("/analizar", (req, res) => {
     const analisis = analizarCasoTexto(caso);
 
     const respuesta = `
-Clasificación de la situación: ${analisis.tipo}
-
-Análisis:
-Se identifica una conducta que afecta la convivencia escolar y que debe ser atendida conforme a los lineamientos institucionales.
+Clasificación: ${analisis.tipo}
 
 Fundamento legal:
-De acuerdo con la Ley 1620 de 2013 y el Decreto 1965 de 2013, las instituciones educativas deben garantizar la atención integral de la convivencia escolar.
+Ley 1620 de 2013 y Decreto 1965 de 2013.
 
-Recomendación institucional:
+Recomendación:
 ${analisis.sanciones.map(s => "- " + s).join("\n")}
 
 Debido proceso:
-Se debe garantizar el derecho a la defensa conforme al artículo 29 de la Constitución Política de Colombia.
-
-Enfoque pedagógico:
-Las medidas deben orientarse a la formación del estudiante, promoviendo la reflexión, la reparación del daño y el mejoramiento de la convivencia.
+Artículo 29 de la Constitución Política de Colombia.
 `;
 
-    const nuevo = {
+    let data = leerDB();
+
+    data.push({
       nombre,
       grado,
       caso,
       tipo: analisis.tipo,
-      fecha: new Date().toLocaleString(),
-    };
+      fecha: new Date().toLocaleString()
+    });
 
-    let data = JSON.parse(fs.readFileSync(DB_FILE));
-    data.push(nuevo);
-    fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2));
+    guardarDB(data);
 
     res.json({ resultado: respuesta });
 
-  } catch (e) {
-    res.json({ resultado: "Error en el análisis." });
+  } catch (error) {
+    console.log(error);
+    res.json({ resultado: "Error controlado." });
   }
 });
 
 // HISTORIAL
 app.get("/casos", (req, res) => {
-  const data = JSON.parse(fs.readFileSync(DB_FILE));
-  res.json(data);
+  res.json(leerDB());
 });
 
+// TEST
 app.get("/", (req, res) => {
   res.send("Servidor activo ✅");
 });

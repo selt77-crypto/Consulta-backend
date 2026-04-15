@@ -1,119 +1,108 @@
 const express = require("express");
 const cors = require("cors");
+const fs = require("fs");
 
 const app = express();
-
-// CONFIGURACIÓN
 app.use(cors());
 app.use(express.json());
 
-// 🔹 RUTA PRINCIPAL (para probar)
-app.get("/", (req, res) => {
-  res.send("Servidor activo ✅");
-});
+const DB_FILE = "casos.json";
 
-// 🔹 FUNCIÓN PARA CLASIFICAR EL CASO (INTELIGENCIA BÁSICA)
+if (!fs.existsSync(DB_FILE)) {
+  fs.writeFileSync(DB_FILE, JSON.stringify([]));
+}
+
+// 🔍 ANALISIS + SANCIONES
 function analizarCasoTexto(caso) {
-  const texto = caso.toLowerCase();
+  const t = caso.toLowerCase();
 
-  if (
-    texto.includes("golpear") ||
-    texto.includes("agresión física") ||
-    texto.includes("arma") ||
-    texto.includes("droga")
-  ) {
+  if (t.includes("golpear") || t.includes("droga") || t.includes("amenaza")) {
     return {
       tipo: "Tipo III",
-      analisis:
-        "Se identifica una situación grave que puede comprometer la integridad física o constituir una posible conducta delictiva.",
-      medidas: [
-        "Remisión a entidades externas",
-        "Citación urgente a acudiente",
+      sanciones: [
+        "Remisión inmediata a coordinación",
         "Activación del Comité de Convivencia",
+        "Citación urgente a acudiente",
+        "Posible remisión a entidades externas (ICBF / Policía de infancia)",
       ],
     };
   }
 
-  if (
-    texto.includes("insulto") ||
-    texto.includes("grosería") ||
-    texto.includes("irrespeto") ||
-    texto.includes("reiteradamente") ||
-    texto.includes("tarde")
-  ) {
+  if (t.includes("grosería") || t.includes("irrespeto") || t.includes("tarde")) {
     return {
       tipo: "Tipo II",
-      analisis:
-        "Se identifica una situación que afecta la convivencia escolar de manera reiterada o significativa.",
-      medidas: [
+      sanciones: [
         "Citación a acudiente",
-        "Compromiso pedagógico",
+        "Compromiso pedagógico escrito",
         "Seguimiento por coordinación",
+        "Registro en observador del estudiante",
       ],
     };
   }
 
   return {
     tipo: "Tipo I",
-    analisis:
-      "Se identifica una situación leve que puede resolverse mediante diálogo y orientación pedagógica.",
-    medidas: [
+    sanciones: [
       "Llamado de atención",
-      "Orientación pedagógica",
-      "Seguimiento básico",
+      "Reflexión pedagógica",
+      "Orientación formativa",
     ],
   };
 }
 
-// 🔹 RUTA PRINCIPAL DE ANÁLISIS
+// 🔴 ANALIZAR CASO
 app.post("/analizar", (req, res) => {
   try {
     const { nombre, grado, caso } = req.body;
 
-    if (!nombre || !grado || !caso) {
-      return res.json({
-        resultado: "Faltan datos para analizar el caso.",
-      });
-    }
+    const analisis = analizarCasoTexto(caso);
 
-    const resultadoAnalisis = analizarCasoTexto(caso);
-
-    // 🔥 RESPUESTA FINAL
     const respuesta = `
-Clasificación: ${resultadoAnalisis.tipo}
+Clasificación de la situación: ${analisis.tipo}
 
 Análisis:
-${resultadoAnalisis.analisis}
+Se identifica una conducta que afecta la convivencia escolar y que debe ser atendida conforme a los lineamientos institucionales.
 
 Fundamento legal:
-De acuerdo con la Ley 1620 de 2013 y el Decreto 1965 de 2013.
+De acuerdo con la Ley 1620 de 2013 y el Decreto 1965 de 2013, las instituciones educativas deben garantizar la atención integral de la convivencia escolar.
+
+Recomendación institucional:
+${analisis.sanciones.map(s => "- " + s).join("\n")}
 
 Debido proceso:
 Se debe garantizar el derecho a la defensa conforme al artículo 29 de la Constitución Política de Colombia.
 
-Medidas:
-${resultadoAnalisis.medidas.map(m => "- " + m).join("\n")}
-
-Observación:
-Se deja constancia para efectos institucionales.
+Enfoque pedagógico:
+Las medidas deben orientarse a la formación del estudiante, promoviendo la reflexión, la reparación del daño y el mejoramiento de la convivencia.
 `;
 
-    res.json({
-      resultado: respuesta,
-    });
+    const nuevo = {
+      nombre,
+      grado,
+      caso,
+      tipo: analisis.tipo,
+      fecha: new Date().toLocaleString(),
+    };
 
-  } catch (error) {
-    console.log("Error:", error);
+    let data = JSON.parse(fs.readFileSync(DB_FILE));
+    data.push(nuevo);
+    fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2));
 
-    res.json({
-      resultado: "Error controlado. Intente nuevamente.",
-    });
+    res.json({ resultado: respuesta });
+
+  } catch (e) {
+    res.json({ resultado: "Error en el análisis." });
   }
 });
 
-// 🔹 PUERTO (IMPORTANTE PARA RENDER)
-const PORT = process.env.PORT || 10000;
-
-app.listen(PORT, () => {
-  console.log("Servidor corriendo en puerto " + PORT);
+// HISTORIAL
+app.get("/casos", (req, res) => {
+  const data = JSON.parse(fs.readFileSync(DB_FILE));
+  res.json(data);
 });
+
+app.get("/", (req, res) => {
+  res.send("Servidor activo ✅");
+});
+
+app.listen(process.env.PORT || 10000);

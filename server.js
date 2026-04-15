@@ -8,163 +8,170 @@ app.use(express.json());
 
 const DB = "casos.json";
 
-// Crear DB si no existe
-function ensureDB() {
-  if (!fs.existsSync(DB)) {
-    fs.writeFileSync(DB, JSON.stringify([]));
-  }
+if (!fs.existsSync(DB)) {
+  fs.writeFileSync(DB, JSON.stringify([]));
 }
-ensureDB();
 
-// Leer DB seguro
-function readDB() {
+// 🔍 BASE DE DATOS
+function leerDB() {
   try {
-    ensureDB();
-    const raw = fs.readFileSync(DB, "utf-8");
-    return JSON.parse(raw || "[]");
-  } catch (e) {
-    fs.writeFileSync(DB, JSON.stringify([]));
+    return JSON.parse(fs.readFileSync(DB));
+  } catch {
     return [];
   }
 }
 
-// Guardar DB seguro
-function writeDB(data) {
-  try {
-    fs.writeFileSync(DB, JSON.stringify(data, null, 2));
-  } catch (e) {
-    console.log("Error guardando DB");
-  }
+function guardarDB(data) {
+  fs.writeFileSync(DB, JSON.stringify(data, null, 2));
 }
 
-// 🔍 ANÁLISIS NIVEL RECTORÍA
-function analizarCasoTexto(caso) {
-  const t = (caso || "").toLowerCase();
+// 🧠 NORMALIZAR TEXTO
+function normalizar(texto) {
+  return texto.toLowerCase().replace(/[.,;:]/g, "");
+}
 
-  // Tipo III
-  if (
-    t.includes("golpe") ||
-    t.includes("agred") ||
-    t.includes("pelea") ||
-    t.includes("amenaza") ||
-    t.includes("arma") ||
-    t.includes("droga")
-  ) {
+// 🧠 ANÁLISIS NIVEL RECTORÍA
+function analizarCasoTexto(caso) {
+
+  const t = normalizar(caso);
+
+  // 🔍 VARIABLES SEMÁNTICAS
+  const agresion = ["golpe","pega","puño","patada","agrede","pelea","violencia","lesiona"];
+  const respuesta = ["responde","reacciona","tambien","el otro","devuelve"];
+  const reiteracion = ["reiteradamente","varias veces","constantemente"];
+  const irrespeto = ["groseria","insulta","ofende","irrespeto"];
+  const riesgo = ["arma","droga","amenaza"];
+
+  let hayAgresion = agresion.some(p => t.includes(p));
+  let hayRespuesta = respuesta.some(p => t.includes(p));
+  let hayReiteracion = reiteracion.some(p => t.includes(p));
+  let hayIrrespeto = irrespeto.some(p => t.includes(p));
+  let hayRiesgo = riesgo.some(p => t.includes(p));
+
+  // 🔴 TIPO III
+  if (hayAgresion || hayRiesgo) {
+
     return `Clasificación: Tipo III – Situación grave
 
-Análisis pedagógico:
-Conducta que afecta gravemente la convivencia y requiere intervención inmediata.
+Análisis institucional:
+Se identifica una conducta que compromete la integridad física y emocional de los estudiantes, configurando un escenario de violencia escolar${hayRespuesta ? ", con escalamiento del conflicto entre las partes involucradas" : ""}. Este tipo de comportamiento afecta gravemente el ambiente institucional y requiere intervención inmediata.
 
-Ruta de atención:
-- Registro institucional
-- Activación del Comité de Convivencia
-- Citación inmediata a acudiente
+Ruta de atención institucional:
+- Activación inmediata del Comité Escolar de Convivencia
+- Citación urgente a padres de familia o acudientes
+- Registro formal en el observador del estudiante
 - Remisión a orientación escolar
-- Seguimiento continuo
+- Valoración de remisión a entidades externas (ICBF, Comisaría de Familia)
 
-Medidas pedagógicas:
-- Reflexión guiada
-- Compromiso de convivencia
-- Reparación del daño
-- Acompañamiento psicosocial
+Medidas pedagógicas y correctivas:
+- Proceso de reparación del daño
+- Compromiso formal de convivencia
+- Seguimiento psicosocial continuo
+- Aplicación de medidas contempladas en el Manual de Convivencia
 
 Fundamento legal:
-Ley 1620 de 2013 y Decreto 1965 de 2013
+Ley 1620 de 2013
+Decreto 1965 de 2013
 
-Debido proceso:
-Artículo 29 de la Constitución Política de Colombia.`;
+Garantía del debido proceso:
+Artículo 29 de la Constitución Política de Colombia`;
   }
 
-  // Tipo II
-  if (
-    t.includes("groser") ||
-    t.includes("irrespeto") ||
-    t.includes("tarde") ||
-    t.includes("indisciplina")
-  ) {
-    return `Clasificación: Tipo II – Afecta la convivencia
+  // 🟠 TIPO II
+  if (hayIrrespeto || hayReiteracion) {
 
-Análisis pedagógico:
-Conducta reiterativa que requiere intervención formativa.
+    return `Clasificación: Tipo II – Situación que afecta la convivencia
 
-Ruta de atención:
-- Registro institucional
+Análisis institucional:
+Se evidencia una conducta que interfiere en el adecuado desarrollo del ambiente escolar${hayReiteracion ? ", presentando carácter reiterativo" : ""}, lo cual requiere intervención pedagógica y acompañamiento institucional.
+
+Ruta de atención institucional:
+- Registro en el sistema institucional
 - Citación a acudiente
 - Seguimiento por coordinación
+- Remisión a orientación escolar (según el caso)
 
 Medidas pedagógicas:
 - Compromiso de convivencia
-- Orientación pedagógica
+- Actividades formativas
+- Estrategias de mediación escolar
 
 Fundamento legal:
-Ley 1620 de 2013 y Decreto 1965 de 2013
+Ley 1620 de 2013
+Decreto 1965 de 2013
 
-Debido proceso:
-Artículo 29 de la Constitución Política de Colombia.`;
+Garantía del debido proceso:
+Artículo 29 de la Constitución Política de Colombia`;
   }
 
-  // Tipo I
+  // 🟢 TIPO I
   return `Clasificación: Tipo I – Situación leve
 
-Análisis pedagógico:
-Conducta ocasional que puede corregirse pedagógicamente.
+Análisis institucional:
+Se presenta una conducta ocasional que puede ser abordada mediante estrategias pedagógicas dentro del aula, sin afectar significativamente la convivencia escolar.
 
-Ruta de atención:
+Ruta de atención institucional:
+- Llamado de atención pedagógico
 - Registro básico
 - Seguimiento docente
 
 Medidas pedagógicas:
-- Llamado de atención
+- Reflexión guiada
 - Orientación formativa
 
 Fundamento legal:
-Ley 1620 de 2013 y Decreto 1965 de 2013
+Ley 1620 de 2013
+Decreto 1965 de 2013
 
-Debido proceso:
-Artículo 29 de la Constitución Política de Colombia.`;
+Garantía del debido proceso:
+Artículo 29 de la Constitución Política de Colombia`;
 }
 
-// 🔴 ANALIZAR + GUARDAR
+// 🔴 ANALIZAR
 app.post("/analizar", (req, res) => {
-  try {
-    const { nombre, grado, caso } = req.body;
 
-    if (!nombre || !grado || !caso) {
-      return res.json({ resultado: "Debe completar todos los campos." });
-    }
+  const { nombre, grado, caso } = req.body;
 
-    const resultado = analizarCasoTexto(caso);
-
-    const data = readDB();
-    data.push({
-      nombre,
-      grado,
-      caso,
-      resultado,
-      fecha: new Date().toLocaleString()
-    });
-    writeDB(data);
-
-    res.json({ resultado });
-
-  } catch (e) {
-    res.json({ resultado: "Error interno del servidor." });
+  if (!nombre || !grado || !caso) {
+    return res.json({ resultado: "Debe completar todos los campos." });
   }
+
+  const resultado = analizarCasoTexto(caso);
+
+  let data = leerDB();
+
+  data.push({
+    nombre,
+    grado,
+    caso,
+    resultado,
+    fecha: new Date().toLocaleString()
+  });
+
+  guardarDB(data);
+
+  res.json({ resultado });
+
 });
 
-// 🔴 HISTORIAL GENERAL
+// 📊 HISTORIAL
 app.get("/casos", (req, res) => {
-  res.json(readDB());
+  res.json(leerDB());
 });
 
-// 🔴 BUSCAR POR ESTUDIANTE
+// 🔍 BUSCAR
 app.get("/buscar/:nombre", (req, res) => {
-  const nombre = (req.params.nombre || "").toLowerCase();
-  const data = readDB();
+
+  const nombre = req.params.nombre.toLowerCase();
+
+  const data = leerDB();
+
   const filtrado = data.filter(c =>
-    (c.nombre || "").toLowerCase().includes(nombre)
+    c.nombre.toLowerCase().includes(nombre)
   );
+
   res.json(filtrado);
+
 });
 
 // TEST

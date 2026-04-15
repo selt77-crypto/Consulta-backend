@@ -1,120 +1,54 @@
 const express = require("express");
 const cors = require("cors");
-const fs = require("fs");
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-const DB_FILE = "casos.json";
-
-// 🔒 FUNCIÓN SEGURA PARA LEER
-function leerDB() {
-  try {
-    if (!fs.existsSync(DB_FILE)) {
-      fs.writeFileSync(DB_FILE, JSON.stringify([]));
-      return [];
-    }
-    const data = fs.readFileSync(DB_FILE);
-    return JSON.parse(data);
-  } catch (error) {
-    console.log("Error leyendo DB, reiniciando...");
-    fs.writeFileSync(DB_FILE, JSON.stringify([]));
-    return [];
-  }
-}
-
-// 🔒 FUNCIÓN SEGURA PARA GUARDAR
-function guardarDB(data) {
-  try {
-    fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2));
-  } catch (error) {
-    console.log("Error guardando DB");
-  }
-}
-
-// 🔍 ANÁLISIS
+// 🔍 ANÁLISIS SIMPLE Y ESTABLE
 function analizarCasoTexto(caso) {
   const t = caso.toLowerCase();
 
-  if (t.includes("golpear") || t.includes("droga") || t.includes("amenaza")) {
-    return {
-      tipo: "Tipo III",
-      sanciones: [
-        "Remisión inmediata a coordinación",
-        "Activación del Comité de Convivencia",
-        "Citación urgente a acudiente",
-        "Posible remisión a entidades externas",
-      ],
-    };
+  if (t.includes("golpear") || t.includes("amenaza")) {
+    return "Tipo III - Situación grave. Requiere intervención inmediata y posible activación de entidades externas.";
   }
 
-  if (t.includes("grosería") || t.includes("irrespeto") || t.includes("tarde")) {
-    return {
-      tipo: "Tipo II",
-      sanciones: [
-        "Citación a acudiente",
-        "Compromiso pedagógico",
-        "Seguimiento por coordinación",
-      ],
-    };
+  if (t.includes("grosería") || t.includes("tarde") || t.includes("irrespeto")) {
+    return "Tipo II - Situación que afecta la convivencia. Se recomienda citación a acudiente y seguimiento.";
   }
 
-  return {
-    tipo: "Tipo I",
-    sanciones: [
-      "Llamado de atención",
-      "Orientación pedagógica",
-    ],
-  };
+  return "Tipo I - Situación leve. Se recomienda orientación pedagógica.";
 }
 
-// 🔴 ANALIZAR
+// 🔴 RUTA PRINCIPAL
 app.post("/analizar", (req, res) => {
   try {
     const { nombre, grado, caso } = req.body;
 
-    const analisis = analizarCasoTexto(caso);
+    if (!nombre || !grado || !caso) {
+      return res.json({ resultado: "Faltan datos." });
+    }
 
-    const respuesta = `
-Clasificación: ${analisis.tipo}
+    const resultado = analizarCasoTexto(caso);
+
+    res.json({
+      resultado: `
+Clasificación: ${resultado}
 
 Fundamento legal:
 Ley 1620 de 2013 y Decreto 1965 de 2013.
 
-Recomendación:
-${analisis.sanciones.map(s => "- " + s).join("\n")}
-
 Debido proceso:
 Artículo 29 de la Constitución Política de Colombia.
-`;
-
-    let data = leerDB();
-
-    data.push({
-      nombre,
-      grado,
-      caso,
-      tipo: analisis.tipo,
-      fecha: new Date().toLocaleString()
+`
     });
 
-    guardarDB(data);
-
-    res.json({ resultado: respuesta });
-
   } catch (error) {
-    console.log(error);
     res.json({ resultado: "Error controlado." });
   }
 });
 
-// HISTORIAL
-app.get("/casos", (req, res) => {
-  res.json(leerDB());
-});
-
-// TEST
+// 🔴 PRUEBA
 app.get("/", (req, res) => {
   res.send("Servidor activo ✅");
 });

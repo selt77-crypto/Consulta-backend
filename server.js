@@ -1,16 +1,47 @@
 const express = require("express");
 const cors = require("cors");
+const fs = require("fs");
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-// 🔍 FUNCIÓN DE ANÁLISIS MEJORADA (CLASIFICA BIEN)
+const DB = "casos.json";
+
+// Crear DB si no existe
+function ensureDB() {
+  if (!fs.existsSync(DB)) {
+    fs.writeFileSync(DB, JSON.stringify([]));
+  }
+}
+ensureDB();
+
+// Leer DB seguro
+function readDB() {
+  try {
+    ensureDB();
+    const raw = fs.readFileSync(DB, "utf-8");
+    return JSON.parse(raw || "[]");
+  } catch (e) {
+    fs.writeFileSync(DB, JSON.stringify([]));
+    return [];
+  }
+}
+
+// Guardar DB seguro
+function writeDB(data) {
+  try {
+    fs.writeFileSync(DB, JSON.stringify(data, null, 2));
+  } catch (e) {
+    console.log("Error guardando DB");
+  }
+}
+
+// 🔍 ANÁLISIS NIVEL RECTORÍA
 function analizarCasoTexto(caso) {
+  const t = (caso || "").toLowerCase();
 
-  const t = caso.toLowerCase();
-
-  // 🔴 TIPO III (GRAVE)
+  // Tipo III
   if (
     t.includes("golpe") ||
     t.includes("agred") ||
@@ -19,81 +50,124 @@ function analizarCasoTexto(caso) {
     t.includes("arma") ||
     t.includes("droga")
   ) {
-    return `
-Clasificación: Tipo III - Situación grave
+    return `Clasificación: Tipo III – Situación grave
 
-Recomendación:
-- Activación inmediata del Comité de Convivencia Escolar
-- Citación urgente a acudiente
-- Registro en observador del estudiante
-- Posible remisión a entidades externas (ICBF, Comisaría de Familia)
+Análisis pedagógico:
+Conducta que afecta gravemente la convivencia y requiere intervención inmediata.
+
+Ruta de atención:
+- Registro institucional
+- Activación del Comité de Convivencia
+- Citación inmediata a acudiente
+- Remisión a orientación escolar
+- Seguimiento continuo
+
+Medidas pedagógicas:
+- Reflexión guiada
+- Compromiso de convivencia
+- Reparación del daño
+- Acompañamiento psicosocial
 
 Fundamento legal:
-Ley 1620 de 2013 y Decreto 1965 de 2013.
+Ley 1620 de 2013 y Decreto 1965 de 2013
 
 Debido proceso:
-Artículo 29 de la Constitución Política de Colombia.
-`;
+Artículo 29 de la Constitución Política de Colombia.`;
   }
 
-  // 🟠 TIPO II (MODERADO)
+  // Tipo II
   if (
     t.includes("groser") ||
     t.includes("irrespeto") ||
     t.includes("tarde") ||
     t.includes("indisciplina")
   ) {
-    return `
-Clasificación: Tipo II - Situación que afecta la convivencia
+    return `Clasificación: Tipo II – Afecta la convivencia
 
-Recomendación:
+Análisis pedagógico:
+Conducta reiterativa que requiere intervención formativa.
+
+Ruta de atención:
+- Registro institucional
 - Citación a acudiente
-- Compromiso pedagógico
 - Seguimiento por coordinación
 
-Fundamento legal:
-Ley 1620 de 2013 y Decreto 1965 de 2013.
-
-Debido proceso:
-Artículo 29 de la Constitución Política de Colombia.
-`;
-  }
-
-  // 🟢 TIPO I (LEVE)
-  return `
-Clasificación: Tipo I - Situación leve
-
-Recomendación:
-- Llamado de atención
+Medidas pedagógicas:
+- Compromiso de convivencia
 - Orientación pedagógica
 
 Fundamento legal:
-Ley 1620 de 2013 y Decreto 1965 de 2013.
+Ley 1620 de 2013 y Decreto 1965 de 2013
 
 Debido proceso:
-Artículo 29 de la Constitución Política de Colombia.
-`;
+Artículo 29 de la Constitución Política de Colombia.`;
+  }
+
+  // Tipo I
+  return `Clasificación: Tipo I – Situación leve
+
+Análisis pedagógico:
+Conducta ocasional que puede corregirse pedagógicamente.
+
+Ruta de atención:
+- Registro básico
+- Seguimiento docente
+
+Medidas pedagógicas:
+- Llamado de atención
+- Orientación formativa
+
+Fundamento legal:
+Ley 1620 de 2013 y Decreto 1965 de 2013
+
+Debido proceso:
+Artículo 29 de la Constitución Política de Colombia.`;
 }
 
-// 🔴 RUTA PRINCIPAL
+// 🔴 ANALIZAR + GUARDAR
 app.post("/analizar", (req, res) => {
   try {
     const { nombre, grado, caso } = req.body;
 
     if (!nombre || !grado || !caso) {
-      return res.json({ resultado: "Faltan datos." });
+      return res.json({ resultado: "Debe completar todos los campos." });
     }
 
     const resultado = analizarCasoTexto(caso);
 
+    const data = readDB();
+    data.push({
+      nombre,
+      grado,
+      caso,
+      resultado,
+      fecha: new Date().toLocaleString()
+    });
+    writeDB(data);
+
     res.json({ resultado });
 
-  } catch (error) {
-    res.json({ resultado: "Error controlado en el servidor." });
+  } catch (e) {
+    res.json({ resultado: "Error interno del servidor." });
   }
 });
 
-// 🔴 PRUEBA
+// 🔴 HISTORIAL GENERAL
+app.get("/casos", (req, res) => {
+  res.json(readDB());
+});
+
+// 🔴 BUSCAR POR ESTUDIANTE
+app.get("/buscar/:nombre", (req, res) => {
+  const nombre = (req.params.nombre || "").toLowerCase();
+  const data = readDB();
+  const filtrado = data.filter(c =>
+    (c.nombre || "").toLowerCase().includes(nombre)
+  );
+  res.json(filtrado);
+});
+
+// TEST
 app.get("/", (req, res) => {
   res.send("Servidor activo ✅");
 });
